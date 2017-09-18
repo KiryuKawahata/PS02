@@ -64,7 +64,7 @@ plot
 test <- train %>% 
   select(-price_doc)
 
-spline_Test <- smooth.spline(x = test$kremlin_km, y = test$price_doc, cv = 10)
+spline_Test <- smooth.spline(x = train$kremlin_km, y = train$price_doc, df = 10)
 Spline_Test_Tidy <- spline_Test %>%
   broom::augment()
 plot <- ggplot(Spline_Test_Tidy, aes(x=x)) +
@@ -85,10 +85,6 @@ submission <- output %>%
   rename(id = x) %>%
   rename(price_doc = y) %>% 
   select(id,price_doc)
-
-Dist_aov <- aov(price_doc ~ id, data = submission) 
-
-summary(Dist_aov)
 
 ```
 
