@@ -1,6 +1,6 @@
 ---
 title: "STAT/MATH 495: Problem Set 02"
-author: "WRITE YOUR NAMES HERE"
+author: "Kiryu Kawahata"
 date: "2017-09-19"
 output:
   html_document:
@@ -16,6 +16,7 @@ knitr::opts_chunk$set(echo = TRUE, fig.width=8, fig.height=4.5)
 
 # Load packages
 library(tidyverse)
+library(broom)
 
 # Note the relative file path, and not absolute file path:
 # http://www.coffeecup.com/help/articles/absolute-vs-relative-pathslinks/
@@ -26,6 +27,31 @@ train <- read_csv("data/train.csv")
 # Exploratory Data Analysis
 
 ```{r}
+#Create a test dataframe (if necessary)
+test <- train 
+  
+test$group <- factor(test$sub_area)
+
+#housing id as the predictor for price_doc
+Exp_spline <- smooth.spline(x = train$id, y = train$price_doc, df = 3)%>%
+  broom::augment()
+
+greater_area <- train %>% 
+  filter(train$full_sq >= 250) %>% 
+  select(full_sq, price_doc) 
+Lesser_area <- train %>% 
+  filter(train$full_sq <= 250) %>% 
+  select(full_sq, price_doc)
+
+spline_Test <- smooth.spline(x = Lesser_area$full_sq, y = Lesser_area$price_doc, df = 36.6)
+Spline_Test_Tidy <- spline_Test %>%
+  broom::augment()
+plot <- ggplot(Spline_Test_Tidy, aes(x=x)) +
+  geom_point(aes(y=y)) +
+  geom_line(aes(y=.fitted), col= "blue") 
+plot
+
+
 
 ```
 
@@ -34,6 +60,36 @@ train <- read_csv("data/train.csv")
 
 ```{r}
 
+
+test <- train %>% 
+  select(-price_doc)
+
+spline_Test <- smooth.spline(x = test$kremlin_km, y = test$price_doc, cv = 10)
+Spline_Test_Tidy <- spline_Test %>%
+  broom::augment()
+plot <- ggplot(Spline_Test_Tidy, aes(x=x)) +
+  geom_point(aes(y=y)) +
+  geom_line(aes(y=.fitted), col= "blue") 
+plot
+
+new_dist <- c(30474:38135)
+
+output <- predict(spline_Test, new_dist) %>% 
+  tibble::as.tibble()
+
+plot +
+  geom_point(data=output, aes(x=x, y=y), col="red")
+
+
+submission <- output %>% 
+  rename(id = x) %>%
+  rename(price_doc = y) %>% 
+  select(id,price_doc)
+
+Dist_aov <- aov(price_doc ~ id, data = submission) 
+
+summary(Dist_aov)
+
 ```
 
 
@@ -41,5 +97,6 @@ train <- read_csv("data/train.csv")
 
 ```{r}
 
+write.csv(submission, file = "submission.csv", row.names = FALSE, na = "")
 ```
 
