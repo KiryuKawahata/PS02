@@ -28,28 +28,12 @@ train <- read_csv("data/train.csv")
 
 ```{r}
 #Create a test dataframe (if necessary)
-test <- train 
-  
-test$group <- factor(test$sub_area)
+test <- train %>% 
+  select(-price_doc)
 
-#housing id as the predictor for price_doc
+#Housing id as the predictor for price_doc just for overview purposes
 Exp_spline <- smooth.spline(x = train$id, y = train$price_doc, df = 3)%>%
   broom::augment()
-
-greater_area <- train %>% 
-  filter(train$full_sq >= 250) %>% 
-  select(full_sq, price_doc) 
-Lesser_area <- train %>% 
-  filter(train$full_sq <= 250) %>% 
-  select(full_sq, price_doc)
-
-spline_Test <- smooth.spline(x = Lesser_area$full_sq, y = Lesser_area$price_doc, df = 36.6)
-Spline_Test_Tidy <- spline_Test %>%
-  broom::augment()
-plot <- ggplot(Spline_Test_Tidy, aes(x=x)) +
-  geom_point(aes(y=y)) +
-  geom_line(aes(y=.fitted), col= "blue") 
-plot
 
 
 
@@ -58,13 +42,16 @@ plot
 
 # Model Fit
 
+For this model I chose to test the variable kremlin_km from the training set, which evaluates the distance away from the Kremlin each building is in kilometeres. I chose to test this since it is possible that valuations could be affected by how close a residence is to probably the most influential location in the city/country.
+
 ```{r}
 
+#Eliminate extreme values/outliers along the x-axis (distance) past 40 kilometers. I found there to be very few points beyond this distance and decided to use this as a cut off here. 
+Outliers <- train %>% 
+  filter(kremlin_km <= 40)
 
-test <- train %>% 
-  select(-price_doc)
-
-spline_Test <- smooth.spline(x = train$kremlin_km, y = train$price_doc, df = 10)
+#Creation of a spline model using the kremlin_km variable as the predictor, and price_doc as the response using 10 degrees of freedom.
+spline_Test <- smooth.spline(x = Outliers$kremlin_km, y = Outliers$price_doc, df = 10)
 Spline_Test_Tidy <- spline_Test %>%
   broom::augment()
 plot <- ggplot(Spline_Test_Tidy, aes(x=x)) +
@@ -72,19 +59,21 @@ plot <- ggplot(Spline_Test_Tidy, aes(x=x)) +
   geom_line(aes(y=.fitted), col= "blue") 
 plot
 
-new_dist <- c(30474:38135)
-
+# A prediction based on a sequence of 7662 distance values between 0 and 40 km to generate price estimates. 
+new_dist <- seq(from = 0, to = 40, length = 7662)
 output <- predict(spline_Test, new_dist) %>% 
   tibble::as.tibble()
 
-plot +
-  geom_point(data=output, aes(x=x, y=y), col="red")
+#Here I stored a mutated dataset into table "pred_data" which eliminates the x values used in the prediction and created a new column listing corresponding ids formatted for Kaggle submission.
 
-
-submission <- output %>% 
-  rename(id = x) %>%
+pred_data <- output %>% 
+  mutate(id = c(30474:38135)) %>% 
   rename(price_doc = y) %>% 
-  select(id,price_doc)
+  select(-x) %>% 
+  select(id, price_doc)
+
+
+submission <- pred_data
 
 ```
 
@@ -92,7 +81,7 @@ submission <- output %>%
 # Create Submission File
 
 ```{r}
-
+#Generates CSV file for submission
 write.csv(submission, file = "submission.csv", row.names = FALSE, na = "")
 ```
 
